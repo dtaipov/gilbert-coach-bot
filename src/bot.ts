@@ -1,63 +1,81 @@
 import "dotenv/config";
-import TelegramBot, { Message } from 'node-telegram-bot-api';
-import express from 'express';
+import { Bot, webhookCallback, Context } from "grammy";
+import express from "express";
+import { isOperator, getIdStr, OPERATOR_CHAT_IDS } from "./utils";
+import * as answers from "./constants/answers";
+import * as message from "./constants/message";
 
-const app = express();
-app.use(express.json());
+export type BotContext = Context;
 
-const token = process.env.TELEGRAM_TOKEN || "";
-const adminChatId = process.env.ADMINS || "";
-const url = process.env.WEBHOOK_URL || "";
-const port = Number(process.env.PORT) || 3000;
+const bot = new Bot<BotContext>(process.env.TELEGRAM_TOKEN || "");
 
-// Initialize bot based on environment
-const bot = process.env.NODE_ENV === "production"
-    ? new TelegramBot(token, { webHook: { port } })
-    : new TelegramBot(token, { polling: true });
+const reply = async (ctx: BotContext) => {
+  if (!ctx.message) {
+    return;
+  }
 
-// Set webhook for production environment
-if (process.env.NODE_ENV === "production" && url) {
-    bot.setWebHook(`${url}/bot${token}`);
-    console.log("Bot is running in production with webhook.");
-} else {
-    console.log("Bot is running in development with polling.");
+  if (isOperator(ctx.message)) {
+    const replyToMessage = ctx.message.reply_to_message;
+    if (replyToMessage && replyToMessage.text) {
+      if (replyToMessage.text.startsWith(message.MESSAGE_FROM_BEGINNING)) {
+        const chatIdStr = getIdStr(replyToMessage.text, message.MESSAGE_FROM_BEGINNING);
+        try {
+          await bot.api.sendMessage(Number(chatIdStr), `${ctx.message.text}`);
+        } catch (e) {
+          console.log(e);
+          await ctx.reply(`${e}`);
+        }
+        return;
+      }
+    }
+  }
+
+  for (let i = 0; i < OPERATOR_CHAT_IDS.length; i++) {
+    const operatorId = OPERATOR_CHAT_IDS[i];
+    await bot.api.sendMessage(
+      operatorId,
+      `${message.MESSAGE_FROM_BEGINNING}${ctx.message.from.id}: ${ctx.message.text}`,
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "Информация о пользователе",
+                callback_data: `${message.USER_INFO_BEGINNING}:${ctx.message.from.id}`,
+              },
+            ],
+          ],
+        },
+      }
+    );
+  }
+};
+
+const keyboardCommon = {
+    keyboard: [[{ text: "Продукты" }]],
+    is_persistent: true,
+    input_field_placeholder: "Напишите свой вопрос",
 }
 
-// Receive messages
-bot.on('message', (msg: Message) => {
-    const chatId = msg.chat.id;
-    const userMessage = msg.text;
-
-    if (userMessage) {
-        bot.sendMessage(adminChatId, `Message from @${msg.from?.username || 'unknown'} (${chatId}):\n${userMessage}`)
-            .then(() => bot.sendMessage(chatId, "Your message has been sent to the admin. You'll receive a reply soon."))
-            .catch(error => console.log("Error sending message to admin:", error));
-    }
+bot.on("message:file", async (ctx) => {
+  if (isOperator(ctx.msg)) {
+    ctx.reply(JSON.stringify(ctx.msg, null, 2));
+  } else {
+    ctx.reply("Отправка файлов боту не поддерживается");
+  }
 });
+bot.command("start", (ctx) => ctx.reply(answers.INTRODUCTION, { reply_markup: keyboardCommon }));
+bot.on("message:text", reply);
 
-// Handle replies from admin
-bot.onText(/\/reply (\d+) (.+)/, (msg: Message, match: RegExpExecArray | null) => {
-    if (match) {
-        const userChatId = parseInt(match[1]);
-        const replyMessage = match[2];
-
-        bot.sendMessage(userChatId, replyMessage)
-            .then(() => bot.sendMessage(adminChatId, "Reply sent successfully."))
-            .catch(error => {
-                bot.sendMessage(adminChatId, "Error sending reply.");
-                console.log("Error sending reply:", error);
-            });
-    }
-});
-
-// Process webhook requests in production
 if (process.env.NODE_ENV === "production") {
-    app.post(`/bot${token}`, (req, res) => {
-        bot.processUpdate(req.body);
-        res.sendStatus(200);
-    });
+  const app = express();
+  app.use(express.json());
+  app.use(webhookCallback(bot, "express"));
 
-    app.listen(port, () => {
-        console.log(`Server is running on port ${port}`);
-    });
+  const PORT = process.env.PORT || 3000;
+  app.listen(PORT, () => {
+    console.log(`Bot listening on port ${PORT}`);
+  });
+} else {
+  bot.start();
 }
