@@ -1,6 +1,5 @@
 {
   "extends": "@tsconfig/node12/tsconfig.json",
-  "esModuleInterop": true,
   "compilerOptions": {
     "module": "CommonJS",
     "outDir": "dist"
