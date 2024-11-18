@@ -32,18 +32,23 @@ const reply = async (ctx) => {
     }
     for (let i = 0; i < utils_1.OPERATOR_CHAT_IDS.length; i++) {
         const operatorId = utils_1.OPERATOR_CHAT_IDS[i];
-        await bot.api.sendMessage(operatorId, `${message_1.MESSAGE_FROM_BEGINNING}${ctx.message.from.id}: ${ctx.message.text}`, {
-            reply_markup: {
-                inline_keyboard: [
-                    [
-                        {
-                            text: "Информация о пользователе",
-                            callback_data: `${message_1.USER_INFO_BEGINNING}:${ctx.message.from.id}`,
-                        },
+        try {
+            await bot.api.sendMessage(operatorId, `${message_1.MESSAGE_FROM_BEGINNING}${ctx.message.from.id}: ${ctx.message.text}`, {
+                reply_markup: {
+                    inline_keyboard: [
+                        [
+                            {
+                                text: "Информация о пользователе",
+                                callback_data: `${message_1.USER_INFO_BEGINNING}:${ctx.message.from.id}`,
+                            },
+                        ],
                     ],
-                ],
-            },
-        });
+                },
+            });
+        }
+        catch (e) {
+            console.error(e);
+        }
     }
 };
 const keyboardCommon = {
