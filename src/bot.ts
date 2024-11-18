@@ -32,22 +32,26 @@ const reply = async (ctx: BotContext) => {
 
   for (let i = 0; i < OPERATOR_CHAT_IDS.length; i++) {
     const operatorId = OPERATOR_CHAT_IDS[i];
-    await bot.api.sendMessage(
-      operatorId,
-      `${MESSAGE_FROM_BEGINNING}${ctx.message.from.id}: ${ctx.message.text}`,
-      {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              {
-                text: "Информация о пользователе",
-                callback_data: `${USER_INFO_BEGINNING}:${ctx.message.from.id}`,
-              },
+    try {
+      await bot.api.sendMessage(
+        operatorId,
+        `${MESSAGE_FROM_BEGINNING}${ctx.message.from.id}: ${ctx.message.text}`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "Информация о пользователе",
+                  callback_data: `${USER_INFO_BEGINNING}:${ctx.message.from.id}`,
+                },
+              ],
             ],
-          ],
-        },
-      }
-    );
+          },
+        }
+      );
+    } catch (e) {
+      console.error(e);
+    }
   }
 };
 
